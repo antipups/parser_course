@@ -1,0 +1,4 @@
+localhost
+root
+root
+work_curses

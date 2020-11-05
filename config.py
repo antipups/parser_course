@@ -27,4 +27,4 @@ CURRENCY = {
 
 Course: namedtuple = namedtuple('Course', ('Date', 'for_value', 'ruble_value'))
 
-
+AMOUNT_EQUELS = 50

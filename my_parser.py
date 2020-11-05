@@ -1,8 +1,6 @@
-from typing import Dict
 from util import *
+from typing import Dict
 from requests import get
-from time import sleep, monotonic
-# from database import Database
 
 
 def get_request(currency_code: str) -> str:
@@ -27,6 +25,10 @@ def get_request(currency_code: str) -> str:
 
 
 def parse() -> List[Dict[str, List[Course]]]:
+    """
+        Получаем данные с црб страницы, и пускаем их в обработку
+    :return:
+    """
     currencies = []     # список в будущем со словарями где ключ название купюры значение - все курсы
     for title_curr, code_curr in CURRENCY.items():
         # sleep(1)
