@@ -13,7 +13,7 @@ def get_request(currency_code: str) -> str:
     """
     data: dict = DATA.copy()
     data.update({'UniDbQuery.VAL_NM_RQ': currency_code})
-    url = URL[:149] + currency_code + URL[149:]
+    url = URL[:145] + currency_code + URL[151:]
     try:
         request = get(url=url,
                       headers=HEADERS,

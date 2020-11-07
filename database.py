@@ -1,8 +1,8 @@
-from cx_Oracle import Connection
+from cx_Oracle import connect
 from config import *
 from enum import Enum
 from typing import Tuple, Dict, List
-# from pymysql import Connection
+from os.path import exists
 
 
 class Table(Enum):
@@ -10,17 +10,6 @@ class Table(Enum):
         Класс для констант названий таблиц
     """
     courses = 'courses'
-    currencies = 'currencies'
-
-
-def conver_to_string(course: List[Course], id_: str):
-    """
-        Конвертация списка курсов в одну строку для инсерта в бд
-    :param course:
-    :param id_:
-    :return:
-    """
-    return (f'("{id_}", "' + '", "'.join(str(cell) for cell in row) + '")' for row in course)
 
 
 class Database:
@@ -31,15 +20,21 @@ class Database:
         """
             Конструктор класса, тут подключаемся к БД
         """
-        with open('config.txt', 'r') as f:
-            clear_string = lambda line: line[:-1] if '\n' in line else line
-            HOST, PASSWORD, USER, DB = tuple(clear_string(line) for line in f.readlines()[:4])
-        self._connect = Connection(host=HOST,
-                                   user=USER,
-                                   password=PASSWORD,
-                                   db=DB)
-
-        self._cursor = self._connect.cursor()
+        if not exists(FILE_NAME_CONFIG):
+            print('\n\nФайл конфига не найден, нажмите Enter чтобы выйти.')
+            input()
+            quit()
+        with open(FILE_NAME_CONFIG) as f:
+            HOST = f.readline()
+        HOST = HOST[:-1] if '\n' in HOST else HOST
+        try:
+            self._connect = connect(HOST, encoding="UTF-8")
+        except:
+            print('\n\nПри подключении к базе данных произошла ошибка, проверьте файл;\nДля выхода нажмите Enter.')
+            input()
+            quit()
+        else:
+            self._cursor = self._connect.cursor()
 
     def __enter__(self):
         """
@@ -56,6 +51,7 @@ class Database:
         :param exc_tb:
         :return:
         """
+        self._cursor.close()
         self._connect.close()
 
     def commit(self, queries=None):
@@ -67,7 +63,7 @@ class Database:
         if isinstance(queries, str):    # если запрос один (т.к. цикл пройдется посимвольно мы создаем кортеж и кладем в него запрос)
             queries = (queries, )
         for query in queries:
-            self._cursor.execute(query=query)
+            self._cursor.execute(query)
         self._connect.commit()
 
     def truncate_all(self):
@@ -85,11 +81,11 @@ class Database:
         :return:
         """
         title, courses = data.popitem()
-        queries = ['INSERT INTO `currencies` (title)'
-                   f'VALUES ("{title}")',
-                   'INSERT INTO `courses` (`id`, `date`, `amount_foreign_value`, `amount_ruble_value`) '
-                   'VALUES ' + ', '.join(conver_to_string(course=courses,
-                                                          id_=title))]
+        queries = []
+        for course in courses:
+            need_string = f"'{course[0]}', {course[1]}, {course[2].replace(',', '.')}"
+            queries.append('INSERT INTO courses (ID, DATE1, AMOUNT_FOREIGN_VALUE, AMOUNT_RUBLE_VALUE) '
+                           f'    VALUES (\'{title}\', {need_string})')
         self.commit(queries=queries)
 
     def get_course(self, date: str) -> List[tuple]:
@@ -98,11 +94,11 @@ class Database:
         :param date:
         :return:
         """
-        query = 'SELECT `id`,' \
-                '       `amount_foreign_value`, ' \
-                '       `amount_ruble_value` ' \
-                f'FROM `{Table.courses.name}` ' \
-                f'WHERE `date` = "{date}"'
+        query = 'SELECT ID,' \
+                '       AMOUNT_FOREIGN_VALUE, ' \
+                '       AMOUNT_RUBLE_VALUE ' \
+                f'FROM {Table.courses.name} ' \
+                f'WHERE DATE1 = \'{date}\''
         self._cursor.execute(query)
         return self._cursor.fetchall()
 
@@ -112,21 +108,13 @@ class Database:
         :param date:
         :return:
         """
-        query = 'SELECT CONCAT(new_courses.id, /* выводим название сравниваемой валюты */' \
-                '              " - ", ' \
-                '              courses.id,  /* выводим название второй сравниваемой валюты */' \
-                '              ": 1 к ", ' \
-                '              CAST(REPLACE(amount_ruble_value, ",", ".") AS float) / CAST(amount_foreign_value AS float) / course_to_ruble2)  /* получаем цену одной валюты за рублю и после делим вторую валюту на это значение*/' \
-                f'FROM `{Table.courses.name}` ' \
-                f'INNER JOIN (SELECT id, CAST(REPLACE(amount_ruble_value, ",", ".") AS float) / CAST(amount_foreign_value AS float) AS course_to_ruble2 FROM courses WHERE date = "{date}") AS new_courses /* подключаем с помощью крестового соединения (каждый к каждому)*/' \
-                f'WHERE `date` = "{date}" AND course_to_ruble2 != CAST(REPLACE(amount_ruble_value, ",", ".") AS float) / CAST(amount_foreign_value AS float) /* отбираем нужную дату и удаляем курсы 1 к 1*/'
+        query = "SELECT new_courses.ID || ' - ' || courses.ID || ': 1 к ' || ROUND(AMOUNT_RUBLE_VALUE / AMOUNT_FOREIGN_VALUE / course_to_ruble2, 4)  " \
+                 f'FROM courses ' \
+                 f"INNER JOIN (SELECT ID, AMOUNT_RUBLE_VALUE / AMOUNT_FOREIGN_VALUE AS course_to_ruble2 FROM courses WHERE DATE1 = '{date}') new_courses ON new_courses.ID != courses.ID " \
+                 f"WHERE DATE1 = '{date}' AND course_to_ruble2 != AMOUNT_RUBLE_VALUE / AMOUNT_FOREIGN_VALUE"
         self._cursor.execute(query)
         return self._cursor.fetchall()
 
 
 if __name__ == '__main__':
-    # with Database() as db:
-    #     db.truncate_all()
-    # sex = tuple(conver_to_string([Course(1, 2, 3), Course(1, 2, 3)])))
-    # print(tuple(conver_to_string([Course(1, 2, 3), Course(1, 2, 3)])))
     pass

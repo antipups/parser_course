@@ -75,8 +75,7 @@ def check_date(date: str) -> bool:
     :return:
     """
     try:
-        datetime.strptime(date_string=date,
-                          format="%d.%m.%Y")
+        datetime.strptime(date, "%d.%m.%Y")
     except ValueError:
         return False
     else:
@@ -118,7 +117,7 @@ def output_cross_course(courses: Tuple[tuple]):
     if courses:
         decorate_output()
         for index, course in enumerate(courses, start=1):
-            print(course[0])
+            print(course[0].replace('к .', 'к 0.'))
             if index % 4 == 0:
                 decorate_output()
     else:
@@ -134,3 +133,10 @@ def cross_course(date: str):
     with Database() as db:
         output_cross_course(db.get_cross_course(date=date))
 
+
+def check_db_available():
+    """
+        Проверка доступности базы данных
+    :return:
+    """
+    Database()
